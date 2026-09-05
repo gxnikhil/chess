@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  chessmaster:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chessmaster-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=file:./prod.db
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=production_secret_change_me_immediately
+    volumes:
+      - chessmaster_data:/app/prisma
+
+volumes:
+  chessmaster_data:

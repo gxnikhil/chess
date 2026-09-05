@@ -1,0 +1,332 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTH MODELS
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  username      String?   @unique
+  email         String?   @unique
+  emailVerified DateTime?
+  phone         String?   @unique
+  passwordHash  String?
+  displayName   String?
+  avatar        String?
+  country       String?
+  title         String?   // GM, IM, FM, etc.
+  bio           String?
+  isVerified    Boolean   @default(false)
+  isAdmin       Boolean   @default(false)
+  isBanned      Boolean   @default(false)
+  banReason     String?
+  lastOnline    DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+
+  ratings          Rating[]
+  gamesAsWhite     Game[]          @relation("WhitePlayer")
+  gamesAsBlack     Game[]          @relation("BlackPlayer")
+  
+  sentFriendReqs   Friend[]        @relation("FriendFrom")
+  recvFriendReqs   Friend[]        @relation("FriendTo")
+  
+  sentChallenges   Challenge[]     @relation("ChallengeFrom")
+  recvChallenges   Challenge[]     @relation("ChallengeTo")
+  
+  followers        Follow[]        @relation("Following")
+  following        Follow[]        @relation("Follower")
+  
+  notifications    Notification[]
+  sentReports      Report[]        @relation("Reporter")
+  receivedReports  Report[]        @relation("Reported")
+
+  @@index([username])
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// RATING MODELS
+// ============================================
+
+model Rating {
+  id          String   @id @default(cuid())
+  userId      String
+  format      String   // bullet, blitz, rapid, classical, chess960, bot
+  rating      Float    @default(1500)
+  rd          Float    @default(350)   // Rating Deviation (Glicko-2)
+  vol         Float    @default(0.06)  // Volatility (Glicko-2)
+  peakRating  Float    @default(1500)
+  gamesPlayed Int      @default(0)
+  wins        Int      @default(0)
+  losses      Int      @default(0)
+  draws       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, format])
+  @@index([format, rating])
+}
+
+// ============================================
+// GAME MODELS
+// ============================================
+
+model Game {
+  id                 String    @id @default(cuid())
+  
+  whiteId            String
+  blackId            String?
+  
+  timeControl        Int       // base time in seconds
+  increment          Int       @default(0)
+  format             String    // bullet, blitz, rapid, classical
+  variant            String    @default("standard") // standard, chess960
+  rated              Boolean   @default(true)
+  
+  status             String    @default("waiting") // waiting, active, completed, aborted
+  result             String?   // white, black, draw, abort
+  terminationReason  String?   // checkmate, resignation, timeout, stalemate, agreement, repetition, fifty_move, insufficient, disconnect, abort
+  
+  pgn                String?
+  finalFen           String?
+  
+  opening            String?
+  openingEco         String?
+  
+  ratingChangeWhite  Float?
+  ratingChangeBlack  Float?
+  whiteRatingBefore  Float?
+  blackRatingBefore  Float?
+  
+  isBotGame          Boolean   @default(false)
+  botDifficulty      String?
+  botPersonality     String?
+  
+  startedAt          DateTime?
+  endedAt            DateTime?
+  createdAt          DateTime  @default(now())
+
+  whitePlayer        User      @relation("WhitePlayer", fields: [whiteId], references: [id])
+  blackPlayer        User?     @relation("BlackPlayer", fields: [blackId], references: [id])
+  
+  moves              Move[]
+  analysis           GameAnalysis?
+
+  @@index([whiteId])
+  @@index([blackId])
+  @@index([status])
+  @@index([format])
+  @@index([createdAt])
+}
+
+model Move {
+  id          String   @id @default(cuid())
+  gameId      String
+  moveNumber  Int
+  san         String   // Standard Algebraic Notation
+  from        String
+  to          String
+  fen         String
+  evaluation  Float?   // Centipawn evaluation
+  timeSpent   Int?     // ms spent on move
+  timeLeft    Int?     // ms remaining on clock
+  createdAt   DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+}
+
+model GameAnalysis {
+  id               String @id @default(cuid())
+  gameId           String @unique
+  
+  whiteAccuracy    Float?
+  blackAccuracy    Float?
+  avgCplWhite      Float? // Average centipawn loss
+  avgCplBlack      Float?
+  
+  whiteBrilliants  Int    @default(0)
+  whiteBestMoves   Int    @default(0)
+  whiteExcellent   Int    @default(0)
+  whiteGood        Int    @default(0)
+  whiteInaccuracies Int   @default(0)
+  whiteMistakes    Int    @default(0)
+  whiteBlunders    Int    @default(0)
+  
+  blackBrilliants  Int    @default(0)
+  blackBestMoves   Int    @default(0)
+  blackExcellent   Int    @default(0)
+  blackGood        Int    @default(0)
+  blackInaccuracies Int   @default(0)
+  blackMistakes    Int    @default(0)
+  blackBlunders    Int    @default(0)
+  
+  openingAccuracy  Float?
+  performanceScore Float?
+  
+  evaluations      String? // JSON array of per-move evaluations
+  
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// SOCIAL MODELS
+// ============================================
+
+model Friend {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  status    String   @default("pending") // pending, accepted, rejected
+  createdAt DateTime @default(now())
+
+  from User @relation("FriendFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   User @relation("FriendTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+  @@index([toId])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+model Challenge {
+  id          String   @id @default(cuid())
+  fromId      String
+  toId        String
+  timeControl Int
+  increment   Int      @default(0)
+  rated       Boolean  @default(true)
+  color       String   @default("random") // white, black, random
+  status      String   @default("pending") // pending, accepted, rejected, cancelled, expired
+  gameId      String?  // Created game if accepted
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  from User @relation("ChallengeFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   User @relation("ChallengeTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@index([toId, status])
+}
+
+// ============================================
+// NOTIFICATION MODEL
+// ============================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // friend_request, challenge, game_result, new_follower, system
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  relatedId String?  // ID of related entity
+  link      String?  // URL to navigate to
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+// ============================================
+// REPORT MODEL
+// ============================================
+
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  reportedId String
+  gameId     String?
+  reason     String   // cheating, harassment, abusive_language, other
+  details    String?
+  status     String   @default("pending") // pending, reviewed, resolved, dismissed
+  adminNotes String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  reporter User @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("Reported", fields: [reportedId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([reportedId])
+}
+
+// ============================================
+// BOT MODEL
+// ============================================
+
+model BotProfile {
+  id          String @id @default(cuid())
+  name        String @unique
+  personality String // tactical, strategic, endgame, attacker, balanced
+  description String
+  avatar      String?
+  rating      Int
+  difficulty  String // beginner, intermediate, advanced, expert, master, grandmaster
+  style       String // Preferred playing style description
+  depth       Int    @default(10)    // Stockfish depth
+  skillLevel  Int    @default(10)    // Stockfish skill level (0-20)
+  
+  @@index([difficulty])
+}
