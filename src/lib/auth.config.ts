@@ -8,12 +8,8 @@ if (!process.env.AUTH_SECRET && process.env.NEXTAUTH_SECRET) {
 if (!process.env.NEXTAUTH_SECRET && process.env.AUTH_SECRET) {
   process.env.NEXTAUTH_SECRET = process.env.AUTH_SECRET;
 }
-if (!process.env.AUTH_URL && process.env.NEXTAUTH_URL) {
-  process.env.AUTH_URL = process.env.NEXTAUTH_URL;
-}
-if (!process.env.NEXTAUTH_URL && process.env.AUTH_URL) {
-  process.env.NEXTAUTH_URL = process.env.AUTH_URL;
-}
+// NOTE: Do NOT bridge AUTH_URL / NEXTAUTH_URL here.
+// On Vercel, leaving them unset lets next-auth auto-detect the host.
 if (!process.env.AUTH_TRUST_HOST) {
   process.env.AUTH_TRUST_HOST = 'true';
 }
