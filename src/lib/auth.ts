@@ -5,14 +5,15 @@ import bcrypt from 'bcryptjs';
 import prisma from './db';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   pages: {
     signIn: '/login',
     newUser: '/username',
   },
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+      clientId: process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET || '',
     }),
     Credentials({
       id: 'credentials',
@@ -102,15 +103,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account }) {
       if (account?.provider === 'google') {
         try {
+          if (!user.email) {
+            console.error('[OAuth] Google account does not contain an email address');
+            return false;
+          }
+
           const existingUser = await prisma.user.findUnique({
-            where: { email: user.email! },
+            where: { email: user.email },
           });
 
           if (!existingUser) {
             const newUser = await prisma.user.create({
               data: {
-                email: user.email!,
-                displayName: user.name,
+                email: user.email,
+                displayName: user.name || 'Player',
                 avatar: user.image,
                 emailVerified: new Date(),
               },
@@ -120,43 +126,52 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             (user as any).username = null;
             (user as any).isAdmin = false;
           } else {
+            if (existingUser.isBanned) {
+              console.warn(`[OAuth] Banned user ${existingUser.id} attempted Google login`);
+              return false;
+            }
             (user as any).id = existingUser.id;
             (user as any).username = existingUser.username;
             (user as any).isAdmin = existingUser.isAdmin;
           }
 
-          // Save OAuth account link
-          const existingAccount = await prisma.account.findFirst({
+          // Link or update OAuth account in database
+          await prisma.account.upsert({
             where: {
-              provider: account.provider,
-              providerAccountId: account.providerAccountId,
-            },
-          });
-
-          if (!existingAccount) {
-            await prisma.account.create({
-              data: {
-                userId: (user as any).id,
-                type: account.type,
+              provider_providerAccountId: {
                 provider: account.provider,
                 providerAccountId: account.providerAccountId,
-                access_token: account.access_token,
-                refresh_token: account.refresh_token,
-                expires_at: account.expires_at,
-                token_type: account.token_type,
-                scope: account.scope,
-                id_token: account.id_token,
               },
-            });
-          }
+            },
+            update: {
+              access_token: account.access_token,
+              refresh_token: account.refresh_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+            },
+            create: {
+              userId: (user as any).id,
+              type: account.type,
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+              access_token: account.access_token,
+              refresh_token: account.refresh_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+            },
+          });
         } catch (error) {
-          console.error('Error in signIn callback:', error);
+          console.error('[OAuth] Error in signIn callback:', error);
           return false;
         }
       }
       return true;
     },
-    jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = (user as any).id;
         token.username = (user as any).username;
@@ -166,6 +181,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.username = session.username;
         if (session.name) token.name = session.name;
         if (session.image) token.picture = session.image;
+      }
+      // Populate username & role from database if not yet present on token
+      if (token.id && !token.username) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { username: true, isAdmin: true },
+          });
+          if (dbUser?.username) {
+            token.username = dbUser.username;
+            token.isAdmin = dbUser.isAdmin;
+          }
+        } catch {
+          // Non-critical if lookup fails
+        }
       }
       return token;
     },
@@ -181,7 +211,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: 'jwt',
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
 });
 
 async function initializeRatings(userId: string) {

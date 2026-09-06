@@ -3,14 +3,15 @@ import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   pages: {
     signIn: '/login',
     newUser: '/username',
   },
   providers: [
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+      clientId: process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET || '',
     }),
     Credentials({
       name: 'credentials',
@@ -18,8 +19,8 @@ export const authConfig: NextAuthConfig = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
-        // This will be implemented in the main auth.ts
+      async authorize() {
+        // Implemented in main auth.ts
         return null;
       },
     }),
@@ -63,4 +64,5 @@ export const authConfig: NextAuthConfig = {
   session: {
     strategy: 'jwt',
   },
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
 };
