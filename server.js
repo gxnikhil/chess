@@ -2,6 +2,7 @@ const { createServer } = require('http');
 const next = require('next');
 const { Server } = require('socket.io');
 const { Chess } = require('chess.js');
+const { PrismaClient } = require('@prisma/client');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -685,7 +686,19 @@ app.prepare().then(() => {
     }
   }, 60000);
 
-  httpServer.listen(port, () => {
+  httpServer.listen(port, async () => {
     console.log(`\n  ♔ ChessMaster running at http://${hostname}:${port}\n`);
+
+    // Verify database connection on startup
+    const prisma = new PrismaClient();
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      console.log('  🗄️  Connected successfully to PostgreSQL database (chess_db)\n');
+    } catch (err) {
+      console.error('  ❌ Database connection error on startup:', err.message, '\n');
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 });
+
