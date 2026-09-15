@@ -177,7 +177,7 @@ export default function LandingPage() {
             <div className="step-card">
               <div className="step-number">1</div>
               <h3 className="step-title">Create Account</h3>
-              <p className="step-desc">Sign up with Google, email, or phone in under 30 seconds</p>
+              <p className="step-desc">Sign up with Google or email in under 30 seconds</p>
             </div>
             <div className="step-arrow">→</div>
             <div className="step-card">

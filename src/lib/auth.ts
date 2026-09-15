@@ -74,52 +74,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       },
     }),
-    Credentials({
-      id: 'phone-otp',
-      name: 'Phone OTP',
-      credentials: {
-        phone: { label: 'Phone', type: 'tel' },
-        otp: { label: 'OTP', type: 'text' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.phone || !credentials?.otp) return null;
-
-        const phone = credentials.phone as string;
-        const otp = credentials.otp as string;
-
-        // Mock OTP verification — in production, verify against Twilio/etc.
-        if (otp !== '123456') return null;
-
-        try {
-          let user = await prisma.user.findUnique({
-            where: { phone },
-          });
-
-          if (!user) {
-            // Create new user for phone registration
-            user = await prisma.user.create({
-              data: {
-                phone,
-              },
-            });
-            // Initialize ratings for new user
-            await initializeRatings(user.id);
-          }
-
-          if (user.isBanned) return null;
-
-          return {
-            id: user.id,
-            name: user.displayName || user.username || 'Player',
-            image: user.avatar,
-            username: user.username,
-            isAdmin: user.isAdmin,
-          } as any;
-        } catch {
-          return null;
-        }
-      },
-    }),
   ],
   callbacks: {
     async signIn({ user, account }) {

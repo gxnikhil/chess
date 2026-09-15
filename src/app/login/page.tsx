@@ -9,13 +9,9 @@ import { useToast } from '@/lib/toast';
 export default function LoginPage() {
   const router = useRouter();
   const { addToast } = useToast();
-  const [tab, setTab] = useState<'email' | 'phone'>('email');
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -31,35 +27,6 @@ export default function LoginPage() {
         addToast({ type: 'error', message: 'Invalid email or password' });
       } else {
         addToast({ type: 'success', message: 'Welcome back!' });
-        router.push('/dashboard');
-        router.refresh();
-      }
-    } catch {
-      addToast({ type: 'error', message: 'Something went wrong' });
-    }
-    setLoading(false);
-  }
-
-  async function handlePhoneLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!otpSent) {
-      setOtpSent(true);
-      addToast({ type: 'info', message: 'OTP sent to your phone (use 123456 for demo)' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = await signIn('phone-otp', {
-        phone,
-        otp,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        addToast({ type: 'error', message: 'Invalid OTP' });
-      } else {
-        addToast({ type: 'success', message: 'Welcome!' });
         router.push('/dashboard');
         router.refresh();
       }
@@ -93,94 +60,40 @@ export default function LoginPage() {
           Continue with Google
         </button>
 
-        <div className="divider-text">or</div>
+        <div className="divider-text">or sign in with email</div>
 
-        {/* Tab Switcher */}
-        <div className="auth-tabs">
-          <button
-            className={`auth-tab ${tab === 'email' ? 'auth-tab-active' : ''}`}
-            onClick={() => setTab('email')}
-          >
-            ✉️ Email
+        <form onSubmit={handleEmailLogin} className="auth-form">
+          <div className="input-group">
+            <label className="input-label" htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              className="input"
+              placeholder="you@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="input-group">
+            <div className="flex justify-between items-center">
+              <label className="input-label" htmlFor="password">Password</label>
+              <Link href="#" className="auth-forgot-link">Forgot?</Link>
+            </div>
+            <input
+              id="password"
+              type="password"
+              className="input"
+              placeholder="Your password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className={`btn btn-primary btn-lg auth-submit ${loading ? 'btn-loading' : ''}`} disabled={loading}>
+            <span className="btn-text">Sign In</span>
           </button>
-          <button
-            className={`auth-tab ${tab === 'phone' ? 'auth-tab-active' : ''}`}
-            onClick={() => setTab('phone')}
-          >
-            📱 Phone
-          </button>
-        </div>
-
-        {tab === 'email' ? (
-          <form onSubmit={handleEmailLogin} className="auth-form">
-            <div className="input-group">
-              <label className="input-label" htmlFor="email">Email</label>
-              <input
-                id="email"
-                type="email"
-                className="input"
-                placeholder="you@example.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="input-group">
-              <div className="flex justify-between items-center">
-                <label className="input-label" htmlFor="password">Password</label>
-                <Link href="#" className="auth-forgot-link">Forgot?</Link>
-              </div>
-              <input
-                id="password"
-                type="password"
-                className="input"
-                placeholder="Your password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <button type="submit" className={`btn btn-primary btn-lg auth-submit ${loading ? 'btn-loading' : ''}`} disabled={loading}>
-              <span className="btn-text">Sign In</span>
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handlePhoneLogin} className="auth-form">
-            <div className="input-group">
-              <label className="input-label" htmlFor="phone">Phone Number</label>
-              <input
-                id="phone"
-                type="tel"
-                className="input"
-                placeholder="+1 (555) 123-4567"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                required
-                disabled={otpSent}
-              />
-            </div>
-            {otpSent && (
-              <div className="input-group">
-                <label className="input-label" htmlFor="otp">Verification Code</label>
-                <input
-                  id="otp"
-                  type="text"
-                  className="input"
-                  placeholder="Enter 6-digit code"
-                  value={otp}
-                  onChange={e => setOtp(e.target.value)}
-                  maxLength={6}
-                  required
-                  autoFocus
-                />
-                <p className="input-hint">Demo: use code 123456</p>
-              </div>
-            )}
-            <button type="submit" className={`btn btn-primary btn-lg auth-submit ${loading ? 'btn-loading' : ''}`} disabled={loading}>
-              <span className="btn-text">{otpSent ? 'Verify & Sign In' : 'Send Code'}</span>
-            </button>
-          </form>
-        )}
+        </form>
 
         <p className="auth-footer-text">
           Don&apos;t have an account?{' '}
@@ -230,35 +143,6 @@ export default function LoginPage() {
         .auth-google-btn {
           width: 100%;
           gap: var(--sp-3);
-        }
-
-        .auth-tabs {
-          display: flex;
-          gap: var(--sp-2);
-          margin-bottom: var(--sp-4);
-        }
-
-        .auth-tab {
-          flex: 1;
-          padding: var(--sp-2) var(--sp-3);
-          font-size: var(--fs-sm);
-          font-weight: var(--fw-medium);
-          color: var(--text-secondary);
-          background: none;
-          border: 1px solid var(--border-primary);
-          border-radius: var(--radius-md);
-          cursor: pointer;
-          transition: all var(--transition-fast);
-        }
-
-        .auth-tab:hover {
-          background: var(--bg-hover);
-        }
-
-        .auth-tab-active {
-          background: var(--accent-muted);
-          color: var(--accent-text);
-          border-color: var(--accent);
         }
 
         .auth-form {

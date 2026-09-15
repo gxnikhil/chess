@@ -29,6 +29,33 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Google OAuth Setup
+
+To enable "Continue with Google" login, configure the following in your [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services → Credentials → OAuth 2.0 Client IDs**:
+
+### Authorized JavaScript Origins
+
+| Environment | Origin |
+|---|---|
+| Local Development | `http://localhost:3000` |
+| Production | `https://chess-wine-delta.vercel.app` |
+
+### Authorized Redirect URIs
+
+| Environment | Redirect URI |
+|---|---|
+| Local Development | `http://localhost:3000/api/auth/callback/google` |
+| Production | `https://chess-wine-delta.vercel.app/api/auth/callback/google` |
+
+> **Note:** If you get a `redirect_uri_mismatch` error, double-check that the redirect URI in Google Cloud Console **exactly** matches the callback path above (including the scheme and no trailing slash).
+
+Then set these environment variables (in Vercel dashboard for production, or `.env` for local):
+
+```
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
+```
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
