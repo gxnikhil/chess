@@ -439,6 +439,99 @@ app.prepare().then(() => {
       });
     });
 
+    // ---- Challenge System ----
+    socket.on('send-challenge', (data) => {
+      const { toUserId, challenge } = data;
+      const targetSocket = playerSockets.get(toUserId);
+      if (targetSocket) {
+        io.to(targetSocket).emit('challenge-received', challenge);
+      }
+    });
+
+    socket.on('accept-challenge', (data) => {
+      const { challengeId, gameId, fromUserId, toUserId, timeControl, increment, rated, color } = data;
+      const format = classifyTimeControl(timeControl, increment);
+
+      // Determine colors
+      let whiteId, blackId;
+      if (color === 'white') {
+        whiteId = fromUserId;  // Challenger wanted white
+        blackId = toUserId;
+      } else if (color === 'black') {
+        whiteId = toUserId;
+        blackId = fromUserId;  // Challenger wanted black
+      } else {
+        if (Math.random() < 0.5) {
+          whiteId = fromUserId;
+          blackId = toUserId;
+        } else {
+          whiteId = toUserId;
+          blackId = fromUserId;
+        }
+      }
+
+      const game = {
+        id: gameId,
+        chess: new Chess(),
+        whiteId,
+        blackId,
+        whiteTime: timeControl * 1000,
+        blackTime: timeControl * 1000,
+        increment,
+        format,
+        rated,
+        status: 'active',
+        result: null,
+        terminationReason: null,
+        moves: [],
+        lastMoveTime: Date.now(),
+        drawOffer: null,
+        startedAt: Date.now(),
+        whiteRating: 1500,
+        blackRating: 1500,
+      };
+
+      activeGames.set(gameId, game);
+
+      // Join both players into the game room
+      const whiteSocket = playerSockets.get(whiteId);
+      const blackSocket = playerSockets.get(blackId);
+      if (whiteSocket) io.sockets.sockets.get(whiteSocket)?.join(gameId);
+      if (blackSocket) io.sockets.sockets.get(blackSocket)?.join(gameId);
+
+      const gameData = {
+        gameId,
+        whiteId,
+        blackId,
+        timeControl,
+        increment,
+        format,
+        rated,
+      };
+
+      // Notify both players
+      if (whiteSocket) io.to(whiteSocket).emit('challenge-game-start', gameData);
+      if (blackSocket) io.to(blackSocket).emit('challenge-game-start', gameData);
+
+      console.log(`[Challenge] Game created: ${gameId} (${whiteId} vs ${blackId})`);
+    });
+
+    socket.on('decline-challenge', (data) => {
+      const { fromUserId, challengeId } = data;
+      const senderSocket = playerSockets.get(fromUserId);
+      if (senderSocket) {
+        io.to(senderSocket).emit('challenge-declined', { challengeId });
+      }
+    });
+
+    socket.on('cancel-challenge', (data) => {
+      const { toUserId, challengeId } = data;
+      const targetSocket = playerSockets.get(toUserId);
+      if (targetSocket) {
+        io.to(targetSocket).emit('challenge-cancelled', { challengeId });
+      }
+    });
+
     // ---- Disconnect ----
     socket.on('disconnect', () => {
       const userId = socketPlayers.get(socket.id);
